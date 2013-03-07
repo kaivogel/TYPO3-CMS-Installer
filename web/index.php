@@ -36,6 +36,7 @@
 // Run installer first if install.php exists in current directory
 if (file_exists(dirname(__FILE__) . '/install.php')) {
 	header('Location: install.php');
+	exit;
 }
 
 require 'typo3/sysext/core/Classes/Core/Bootstrap.php';

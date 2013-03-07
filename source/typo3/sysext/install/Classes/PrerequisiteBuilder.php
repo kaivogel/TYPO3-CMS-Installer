@@ -45,49 +45,42 @@ class PrerequisiteBuilder {
 	 * @var array
 	 */
 	protected $directories = array(
-		'fileadmin' => array(
-			'_temp_' => NULL,
-			'user_upload' => NULL,
-		),
-		'typo3conf' => array(
-			'ext' => NULL,
-			'l10n' => NULL,
-		),
-		'typo3temp' => NULL,
-		'uploads' => array(
-			'media' => NULL,
-			'pics' => NULL,
-			'tf' => NULL,
-		),
+		'fileadmin',
+		'fileadmin/_temp_',
+		'fileadmin/user_upload',
+		'typo3conf',
+		'typo3conf/ext',
+		'typo3conf/l10n',
+		'typo3temp',
+		'uploads',
+		'uploads/media',
+		'uploads/pics',
+		'uploads/tf',
 	);
 
 	/**
 	 * @var array
 	 */
 	protected $symlinks = array(
-		'typo3_src'         => '@source',
-		't3lib'             => 'typo3_src/t3lib',
-		'typo3'             => 'typo3_src/typo3',
-		'index.php'         => 'typo3_src/index.php',
-		'INSTALL.txt'       => 'typo3_src/INSTALL.txt',
-		'README.txt'        => 'typo3_src/README.txt',
-		'RELEASE_NOTES.txt' => 'typo3_src/RELEASE_NOTES.txt',
+		'typo3_src' => '../source',
+		't3lib' => 'typo3_src/t3lib',
+		'typo3' => 'typo3_src/typo3',
 	);
-
-	/**
-	 * @var integer
-	 */
-	protected $directoryAccessMode = 777;
-
-	/**
-	 * @var integer
-	 */
-	protected $fileAccessMode = 664;
 
 	/**
 	 * @var string
 	 */
-	protected $lastDirectory;
+	protected $folderCreateMask = '0755';
+
+	/**
+	 * @var string
+	 */
+	protected $fileCreateMask = '0644';
+
+	/**
+	 * @var string
+	 */
+	protected $workingDirectory;
 
 	/**
 	 * Return 'this' as singleton
@@ -105,16 +98,28 @@ class PrerequisiteBuilder {
 	/**
 	 * Build all prerequisites at once
 	 *
+	 * @param string $workingDirectory The absolute path
 	 * @return void
 	 */
-	static public function buildAll() {
+	static public function buildAll($workingDirectory) {
 		static::getInstance()
+			->setWorkingDirectory($workingDirectory)
 			->createDirectoryStructure()
 			->createSymlinks()
 			->createHtaccessFile()
-			->createExtTablesFile()
 			->createLocalConfigurationFile()
 			->createFirstInstallFile();
+	}
+
+	/**
+	 * Set absolute path of the working directory
+	 *
+	 * @param string $workingDirectory The absolute path
+	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 */
+	public function setWorkingDirectory($workingDirectory) {
+		$this->workingDirectory = realpath($workingDirectory) . '/';
+		return $this;
 	}
 
 	/**
@@ -123,7 +128,15 @@ class PrerequisiteBuilder {
 	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
 	 */
 	public function createDirectoryStructure() {
-		$this->createRecursiveDirectories($this->directories, $this->directoryAccessMode);
+		foreach ($this->directories as $directory) {
+			$path = $this->workingDirectory . trim($directory, '/ ');
+			if (@file_exists($path) === FALSE) {
+				$created = @mkdir($path, octdec($this->folderCreateMask));
+				if ($created || is_dir($path)) {
+					$this->createIndexHtmlFile($directory);
+				}
+			}
+		}
 		return $this;
 	}
 
@@ -134,37 +147,25 @@ class PrerequisiteBuilder {
 	 */
 	public function createSymlinks() {
 		foreach ($this->symlinks as $targetPath => $sourcePath) {
-			if ($sourcePath === '@source') {
-				$sourcePath = 'typo3_src-' . TYPO3_version;
-			}
-			$this->createLink(PATH_site . $sourcePath, PATH_site . $targetPath);
+			$this->createLink(
+				$this->workingDirectory . $sourcePath,
+				$this->workingDirectory . $targetPath
+			);
 		}
 		return $this;
 	}
 
 	/**
-	 * Create _.htaccess file
-	 *
-	 * TODO: If Apache -> write .htaccess instead of _.htaccess
+	 * Create symlink to _.htaccess file
 	 *
 	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
 	 */
 	public function createHtaccessFile() {
-		$filename = PATH_site . '_.htaccess';
-		$content = 'TODO';
-		$this->writeFile($filename, $content);
-		return $this;
-	}
-
-	/**
-	 * Create extTables.php
-	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
-	 */
-	public function createExtTablesFile() {
-		$filename = PATH_typo3conf . 'extTables.php';
-		$content = 'TODO';
-		$this->writeFile($filename, $content);
+		$filename = $this->workingDirectory . '_.htaccess';
+		if (stripos($_SERVER['SERVER_SOFTWARE'], 'apache') !== FALSE) {
+			$filename = $this->workingDirectory . '.htaccess';
+		}
+		$this->createLink($this->workingDirectory . 'typo3/_.htaccess', $filename);
 		return $this;
 	}
 
@@ -174,9 +175,64 @@ class PrerequisiteBuilder {
 	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
 	 */
 	public function createLocalConfigurationFile() {
-		$filename = PATH_typo3conf . 'LocalConfiguration.php';
-		$content = 'TODO';
-		$this->writeFile($filename, $content);
+		$filename = $this->workingDirectory . 'typo3conf/LocalConfiguration.php';
+		$content = "
+<?php
+return array(
+	'BE' => array(
+		'installToolPassword' => 'bacb98acf97e0b6112b1d1b650b84971',
+	),
+	'DB' => array(
+		'extTablesDefinitionScript' => 'extTables.php',
+	),
+	'EXT' => array(
+		'extListArray' => array(
+			'0' => 'info',
+			'1' => 'perm',
+			'2' => 'func',
+			'3' => 'filelist',
+			'4' => 'extbase',
+			'5' => 'fluid',
+			'6' => 'about',
+			'7' => 'version',
+			'8' => 'tsconfig_help',
+			'9' => 'context_help',
+			'10' => 'extra_page_cm_options',
+			'11' => 'impexp',
+			'12' => 'sys_note',
+			'13' => 'tstemplate',
+			'14' => 'tstemplate_ceditor',
+			'15' => 'tstemplate_info',
+			'16' => 'tstemplate_objbrowser',
+			'17' => 'tstemplate_analyzer',
+			'18' => 'func_wizards',
+			'19' => 'wizard_crpages',
+			'20' => 'wizard_sortpages',
+			'21' => 'lowlevel',
+			'22' => 'install',
+			'23' => 'belog',
+			'24' => 'beuser',
+			'25' => 'aboutmodules',
+			'26' => 'setup',
+			'27' => 'taskcenter',
+			'28' => 'info_pagetsconfig',
+			'29' => 'viewpage',
+			'30' => 'rtehtmlarea',
+			'31' => 'css_styled_content',
+			'32' => 't3skin',
+			'33' => 't3editor',
+			'34' => 'reports',
+			'35' => 'felogin',
+			'36' => 'form',
+		),
+	),
+	'SYS' => array(
+		'sitename' => 'New TYPO3 site',
+	),
+);
+?>
+		";
+		$this->writeFile($filename, trim($content, "\n"));
 		return $this;
 	}
 
@@ -186,34 +242,12 @@ class PrerequisiteBuilder {
 	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
 	 */
 	public function createFirstInstallFile() {
-		$quickstartFile = PATH_typo3conf . 'FIRST_INSTALL';
-		$enableInstallToolFile = PATH_typo3conf . 'ENABLE_INSTALL_TOOL';
+		$quickstartFile = $this->workingDirectory . 'typo3conf/FIRST_INSTALL';
+		$enableInstallToolFile = $this->workingDirectory . 'typo3conf/ENABLE_INSTALL_TOOL';
 		if (!is_file($quickstartFile) && !is_file($enableInstallToolFile)) {
 			$this->writeFile($quickstartFile, '');
 		}
 		return $this;
-	}
-
-	/**
-	 * Create recursive directories
-	 *
-	 * @param array $directories Directory structure
-	 * @param integer $accessMode Directory access mode
-	 * @return void
-	 */
-	protected function createRecursiveDirectories(array $directories, $accessMode = 770) {
-		foreach ($directories as $name => $content) {
-			$path = PATH_site . trim($name, '/ ');
-			if (@file_exists($path) === FALSE) {
-				$created = mkdir($path, $accessMode);
-				if ($created || is_dir($path)) {
-					$this->createIndexHtmlFile($path);
-				}
-			}
-			if (is_array($content)) {
-				$this->createRecursiveDirectories($content, $accessMode);
-			}
-		}
 	}
 
 	/**
@@ -223,14 +257,16 @@ class PrerequisiteBuilder {
 	 * @return void
 	 */
 	protected function createIndexHtmlFile($targetPath) {
-		$filename = PATH_site . trim($targetPath, '/ ') . '/index.html';
-		$content = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+		$filename = $this->workingDirectory . trim($targetPath, '/ ') . '/index.html';
+		$content = '
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 <HTML>
 <HEAD>
 <TITLE></TITLE>
 <META http-equiv=Refresh Content="0; Url=/">
 </HEAD>
-</HTML>';
+</HTML>
+		';
 		$this->writeFile($filename, $content);
 	}
 
@@ -246,7 +282,11 @@ class PrerequisiteBuilder {
 	 * @return boolean TRUE on success
 	 */
 	protected function createLink($sourcePath, $targetPath) {
-		return symlink($sourcePath, $targetPath);
+		$sourcePath = realpath($sourcePath);
+		if (@file_exists($sourcePath) !== FALSE && @file_exists($targetPath) === FALSE) {
+			return @symlink($sourcePath, $targetPath);
+		}
+		return FALSE;
 	}
 
 	/**
@@ -258,8 +298,8 @@ class PrerequisiteBuilder {
 	 */
 	protected function writeFile($filename, $content) {
 		if (@file_exists($filename) === FALSE) {
-			file_put_contents($filename, $content);
-			chmod($filename, $this->fileAccessMode);
+			file_put_contents($filename, trim($content, "\n"));
+			@chmod($filename, octdec($this->fileCreateMask));
 		}
 	}
 

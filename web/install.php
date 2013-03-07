@@ -46,7 +46,7 @@ class Install {
 	static protected $cssFiles = array(
 		'../source/typo3/sysext/install/Resources/Public/Stylesheets/reset.css',
 		'../source/typo3/sysext/install/Resources/Public/Stylesheets/general.css',
-		'../source/typo3/sysext/install/Resources/Public/Stylesheets/install_123.css',
+		'../source/typo3/sysext/install/Resources/Public/Stylesheets/install.css',
 	);
 
 	/**
@@ -111,9 +111,6 @@ class Install {
 			$content .= static::getNextButton();
 			static::printContent($content);
 		} else {
-
-			die('Do the magic here...');
-
 			static::buildPrerequisites();
 			static::redirectToInstallTool();
 		}
@@ -198,7 +195,7 @@ class Install {
 	 */
 	static protected function buildPrerequisites() {
 		require '../source/typo3/sysext/install/Classes/PrerequisiteBuilder.php';
-		\TYPO3\CMS\Install\PrerequisiteBuilder::buildAll();
+		\TYPO3\CMS\Install\PrerequisiteBuilder::buildAll(dirname(__FILE__));
 	}
 
 	/**
@@ -207,7 +204,8 @@ class Install {
 	 * @return void
 	 */
 	static protected function redirectToInstallTool() {
-		// TODO
+		header('Location: typo3/install/index.php?mode=123&step=1');
+		exit;
 	}
 
 	/**
