@@ -46,7 +46,7 @@ class Install {
 	static protected $cssFiles = array(
 		'../source/typo3/sysext/install/Resources/Public/Stylesheets/reset.css',
 		'../source/typo3/sysext/install/Resources/Public/Stylesheets/general.css',
-		'../source/typo3/sysext/install/Resources/Public/Stylesheets/install.css',
+		'../source/typo3/sysext/install/Resources/Public/Stylesheets/install_123.css',
 	);
 
 	/**
