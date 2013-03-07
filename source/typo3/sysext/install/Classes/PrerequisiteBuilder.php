@@ -165,7 +165,7 @@ class PrerequisiteBuilder {
 		if (stripos($_SERVER['SERVER_SOFTWARE'], 'apache') !== FALSE) {
 			$filename = $this->workingDirectory . '.htaccess';
 		}
-		$this->createLink($this->workingDirectory . 'typo3/_.htaccess', $filename);
+		$this->createLink($this->workingDirectory . '../source/_.htaccess', $filename);
 		return $this;
 	}
 
