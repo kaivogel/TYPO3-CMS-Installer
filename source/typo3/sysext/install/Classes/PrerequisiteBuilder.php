@@ -42,6 +42,16 @@ class PrerequisiteBuilder {
 	static protected $instance = NULL;
 
 	/**
+	 * @var string
+	 */
+	protected $folderCreateMask = '0755';
+
+	/**
+	 * @var string
+	 */
+	protected $fileCreateMask = '0644';
+
+	/**
 	 * @var array
 	 */
 	protected $directories = array(
@@ -68,14 +78,57 @@ class PrerequisiteBuilder {
 	);
 
 	/**
-	 * @var string
+	 * @var array
 	 */
-	protected $folderCreateMask = '0755';
-
-	/**
-	 * @var string
-	 */
-	protected $fileCreateMask = '0644';
+	protected $defaultConfiguration = array(
+		'BE' => array(
+			'installToolPassword' => 'bacb98acf97e0b6112b1d1b650b84971',
+		),
+		'EXT' => array(
+			'extListArray' => array(
+				'0' => 'info',
+				'1' => 'perm',
+				'2' => 'func',
+				'3' => 'filelist',
+				'4' => 'extbase',
+				'5' => 'fluid',
+				'6' => 'about',
+				'7' => 'version',
+				'8' => 'tsconfig_help',
+				'9' => 'context_help',
+				'10' => 'extra_page_cm_options',
+				'11' => 'impexp',
+				'12' => 'sys_note',
+				'13' => 'tstemplate',
+				'14' => 'tstemplate_ceditor',
+				'15' => 'tstemplate_info',
+				'16' => 'tstemplate_objbrowser',
+				'17' => 'tstemplate_analyzer',
+				'18' => 'func_wizards',
+				'19' => 'wizard_crpages',
+				'20' => 'wizard_sortpages',
+				'21' => 'lowlevel',
+				'22' => 'install',
+				'23' => 'belog',
+				'24' => 'beuser',
+				'25' => 'aboutmodules',
+				'26' => 'setup',
+				'27' => 'taskcenter',
+				'28' => 'info_pagetsconfig',
+				'29' => 'viewpage',
+				'30' => 'rtehtmlarea',
+				'31' => 'css_styled_content',
+				'32' => 't3skin',
+				'33' => 't3editor',
+				'34' => 'reports',
+				'35' => 'felogin',
+				'36' => 'form',
+			),
+		),
+		'SYS' => array(
+			'sitename' => 'New TYPO3 site',
+		),
+	);
 
 	/**
 	 * @var string
@@ -172,67 +225,27 @@ class PrerequisiteBuilder {
 	/**
 	 * Create LocalConfiguration.php
 	 *
+	 * Define the constant "TYPO3_PACKAGE_CONFIGURATION_FILE" with the
+	 * path to your php file to extend default configuration. The file
+	 * must return an array of configuration:
+	 *
+	 * <?php
+	 * return array(...);
+	 * ?>
+	 *
 	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
 	 */
 	public function createLocalConfigurationFile() {
 		$filename = $this->workingDirectory . 'typo3conf/LocalConfiguration.php';
-		$content = "
-<?php
-return array(
-	'BE' => array(
-		'installToolPassword' => 'bacb98acf97e0b6112b1d1b650b84971',
-	),
-	'DB' => array(
-		'extTablesDefinitionScript' => 'extTables.php',
-	),
-	'EXT' => array(
-		'extListArray' => array(
-			'0' => 'info',
-			'1' => 'perm',
-			'2' => 'func',
-			'3' => 'filelist',
-			'4' => 'extbase',
-			'5' => 'fluid',
-			'6' => 'about',
-			'7' => 'version',
-			'8' => 'tsconfig_help',
-			'9' => 'context_help',
-			'10' => 'extra_page_cm_options',
-			'11' => 'impexp',
-			'12' => 'sys_note',
-			'13' => 'tstemplate',
-			'14' => 'tstemplate_ceditor',
-			'15' => 'tstemplate_info',
-			'16' => 'tstemplate_objbrowser',
-			'17' => 'tstemplate_analyzer',
-			'18' => 'func_wizards',
-			'19' => 'wizard_crpages',
-			'20' => 'wizard_sortpages',
-			'21' => 'lowlevel',
-			'22' => 'install',
-			'23' => 'belog',
-			'24' => 'beuser',
-			'25' => 'aboutmodules',
-			'26' => 'setup',
-			'27' => 'taskcenter',
-			'28' => 'info_pagetsconfig',
-			'29' => 'viewpage',
-			'30' => 'rtehtmlarea',
-			'31' => 'css_styled_content',
-			'32' => 't3skin',
-			'33' => 't3editor',
-			'34' => 'reports',
-			'35' => 'felogin',
-			'36' => 'form',
-		),
-	),
-	'SYS' => array(
-		'sitename' => 'New TYPO3 site',
-	),
-);
-?>
-		";
-		$this->writeFile($filename, trim($content, "\n"));
+		$configuration = $this->defaultConfiguration;
+		if (defined('TYPO3_PACKAGE_CONFIGURATION_FILE') && @file_exists(TYPO3_PACKAGE_CONFIGURATION_FILE) !== FALSE) {
+			$additionalConfiguration = include TYPO3_PACKAGE_CONFIGURATION_FILE;
+			if (is_array($additionalConfiguration)) {
+				$configuration = array_merge_recursive($configuration, $additionalConfiguration);
+			}
+		}
+		$content = $this->exportArrayToString($configuration);
+		$this->writeFile($filename, "<?php\nreturn " . trim($content, "\n") . "\n?>");
 		return $this;
 	}
 
@@ -301,6 +314,27 @@ return array(
 			file_put_contents($filename, trim($content, "\n"));
 			@chmod($filename, octdec($this->fileCreateMask));
 		}
+	}
+
+	/**
+	 * Export an array into string
+	 *
+	 * @param array $array The array
+	 * @return string Array as string
+	 */
+	protected function exportArrayToString(array $array) {
+		$replacements = array(
+			'|Array\s*\(|'          => "array(",
+			'| {4}\)|'              => "),",
+			'| {8}|'                => "\t",
+			'| {4}|'                => "\t",
+			'|^\)$|m'               => ");",
+			"|\n{2}|"               => "\n",
+			"|\[([^\]]*)\]|"        => "'$1'",
+			'| => (?!array\()(.*)|' => " => '$1',",
+		);
+		$string = print_r($array, TRUE);
+		return preg_replace(array_keys($replacements), array_values($replacements), $string);
 	}
 
 }

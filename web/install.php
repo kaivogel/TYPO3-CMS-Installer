@@ -112,7 +112,7 @@ class Install {
 			static::printContent($content);
 		} else {
 			static::buildPrerequisites();
-			static::redirectToInstallTool();
+			static::renameInstallerAndRedirect();
 		}
 	}
 
@@ -203,8 +203,9 @@ class Install {
 	 *
 	 * @return void
 	 */
-	static protected function redirectToInstallTool() {
-		header('Location: typo3/install/index.php?mode=123&step=1');
+	static protected function renameInstallerAndRedirect() {
+		rename('install.php', '_install.php');
+		header('Location: index.php');
 		exit;
 	}
 
