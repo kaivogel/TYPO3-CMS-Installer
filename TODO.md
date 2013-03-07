@@ -1,8 +1,4 @@
-* Add extendable factory for the creation of the LocalConfiguration file
-
 * Make script usable for windows systems
-
-* Remove install.php within the installation process (install tool)
 
 * Maybe add two new fields to the third step of install tool to directly set install tool password and site name
 
