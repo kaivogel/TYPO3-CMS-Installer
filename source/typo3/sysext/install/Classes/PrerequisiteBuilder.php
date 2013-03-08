@@ -245,7 +245,7 @@ class PrerequisiteBuilder {
 			}
 		}
 		$content = $this->exportArrayToString($configuration);
-		$this->writeFile($filename, "<?php\nreturn " . trim($content, "\n") . "\n?>");
+		$this->writeFile($filename, "<?php\nreturn " . trim($content, "\n") . ";\n?>");
 		return $this;
 	}
 
@@ -324,16 +324,13 @@ class PrerequisiteBuilder {
 	 */
 	protected function exportArrayToString(array $array) {
 		$replacements = array(
-			'|Array\s*\(|'          => "array(",
-			'| {4}\)|'              => "),",
-			'| {8}|'                => "\t",
-			'| {4}|'                => "\t",
-			'|^\)$|m'               => ");",
-			"|\n{2}|"               => "\n",
-			"|\[([^\]]*)\]|"        => "'$1'",
-			'| => (?!array\()(.*)|' => " => '$1',",
+			"| =>[\s\n]*array \(|" => " => array(",
+			"|(\d{1,}) =>|" => "'$1' =>",
+			"| {2}|" => "\t",
 		);
-		$string = print_r($array, TRUE);
+		ob_start();
+		var_export($array);
+		$string = ob_get_clean();
 		return preg_replace(array_keys($replacements), array_values($replacements), $string);
 	}
 
