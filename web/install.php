@@ -38,23 +38,28 @@ class Install {
 	/**
 	 * @var string
 	 */
+	static protected $sourceDirectory = '../typo3_src-6.1.0/';
+
+	/**
+	 * @var string
+	 */
 	static protected $copyrightYear = '1998-2013';
 
 	/**
 	 * @var array
 	 */
 	static protected $cssFiles = array(
-		'../source/typo3/sysext/install/Resources/Public/Stylesheets/reset.css',
-		'../source/typo3/sysext/install/Resources/Public/Stylesheets/general.css',
-		'../source/typo3/sysext/install/Resources/Public/Stylesheets/install_123.css',
+		'typo3/sysext/install/Resources/Public/Stylesheets/reset.css',
+		'typo3/sysext/install/Resources/Public/Stylesheets/general.css',
+		'typo3/sysext/install/Resources/Public/Stylesheets/install_123.css',
 	);
 
 	/**
 	 * @var array
 	 */
 	static protected $jsFiles = array(
-		'../source/typo3/contrib/prototype/prototype.js',
-		'../source/typo3/sysext/install/Resources/Public/Javascript/install.js',
+		'typo3/contrib/prototype/prototype.js',
+		'typo3/sysext/install/Resources/Public/Javascript/install.js',
 	);
 
 	/**
@@ -122,7 +127,7 @@ class Install {
 	 * @return string HTML result of the check
 	 */
 	static protected function checkEnvironment() {
-		require '../source/typo3/sysext/install/Classes/SystemEnvironment/Check.php';
+		require static::getSourcePath('typo3/sysext/install/Classes/SystemEnvironment/Check.php');
 		/** @var $statusCheck \TYPO3\CMS\Install\SystemEnvironment\Check */
 		$statusCheck = new \TYPO3\CMS\Install\SystemEnvironment\Check();
 		$statusObjects = $statusCheck->getStatus();
@@ -194,8 +199,8 @@ class Install {
 	 * @return void
 	 */
 	static protected function buildPrerequisites() {
-		require '../source/typo3/sysext/install/Classes/PrerequisiteBuilder.php';
-		\TYPO3\CMS\Install\PrerequisiteBuilder::buildAll(dirname(__FILE__));
+		require static::getSourcePath('typo3/sysext/install/Classes/PrerequisiteBuilder.php');
+		\TYPO3\CMS\Install\PrerequisiteBuilder::buildAll(static::$sourceDirectory, dirname(__FILE__));
 	}
 
 	/**
@@ -216,8 +221,9 @@ class Install {
 	 * @return void
 	 */
 	static protected function printContent($content) {
+		$faviconFile = static::getSourcePath('typo3/gfx/favicon.ico');
 		$replacements = array(
-			'@favicon'   => static::getDataImage('../source/typo3/gfx/favicon.ico'),
+			'@favicon'   => static::getDataImage($faviconFile),
 			'@version'   => static::$version,
 			'@css'       => static::getCss(),
 			'@content'   => $content,
@@ -241,7 +247,7 @@ class Install {
 	static protected function getCss() {
 		$content = '';
 		foreach (static::$cssFiles as $filename) {
-			$content .= "\n" . file_get_contents($filename);
+			$content .= "\n" . file_get_contents(static::getSourcePath($filename));
 		}
 		$content = preg_replace_callback('|url\(([^)]*)\)|', 'static::getCssReplaceCallback', $content);
 		return $content;
@@ -259,8 +265,8 @@ class Install {
 		}
 		$filename = trim($matches[1], '"\' ');
 		$replacements = array(
-			'../Images/' => '../source/typo3/sysext/install/Resources/Public/Images/',
-			'../../../../../gfx/' => '../source/typo3/gfx/',
+			'../Images/' => static::getSourcePath('typo3/sysext/install/Resources/Public/Images/'),
+			'../../../../../gfx/' => static::getSourcePath('typo3/gfx/'),
 		);
 		$filename = str_replace(array_keys($replacements), array_values($replacements), $filename);
 		return "url('" . static::getDataImage($filename) . "')";
@@ -274,7 +280,7 @@ class Install {
 	static protected function getJs() {
 		$content = '';
 		foreach (static::$jsFiles as $filename) {
-			$content .= "\n" . file_get_contents($filename);
+			$content .= "\n" . file_get_contents(static::getSourcePath($filename));
 		}
 		return $content;
 	}
@@ -292,6 +298,16 @@ class Install {
 			return 'data:image/' . $type . ';base64,' . $data;
 		}
 		return '';
+	}
+
+	/**
+	 * Returns the full relative path of a file
+	 *
+	 * @param string $filename The filename relative to source directory
+	 * @return string The relative path
+	 */
+	static protected function getSourcePath($filename) {
+		return rtrim(static::$sourceDirectory, '/') . '/' . $filename;
 	}
 
 }

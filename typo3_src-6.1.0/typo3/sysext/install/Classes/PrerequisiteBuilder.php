@@ -72,7 +72,7 @@ class PrerequisiteBuilder {
 	 * @var array
 	 */
 	protected $symlinks = array(
-		'typo3_src' => '../source',
+		'typo3_src' => '@source',
 		't3lib' => 'typo3_src/t3lib',
 		'typo3' => 'typo3_src/typo3',
 	);
@@ -133,6 +133,11 @@ class PrerequisiteBuilder {
 	/**
 	 * @var string
 	 */
+	protected $sourceDirectory;
+
+	/**
+	 * @var string
+	 */
 	protected $workingDirectory;
 
 	/**
@@ -151,11 +156,13 @@ class PrerequisiteBuilder {
 	/**
 	 * Build all prerequisites at once
 	 *
-	 * @param string $workingDirectory The absolute path
+	 * @param string $sourceDirectory The source directory
+	 * @param string $workingDirectory The working directory
 	 * @return void
 	 */
-	static public function buildAll($workingDirectory) {
+	static public function buildAll($sourceDirectory, $workingDirectory) {
 		static::getInstance()
+			->setSourceDirectory($sourceDirectory)
 			->setWorkingDirectory($workingDirectory)
 			->createDirectoryStructure()
 			->createSymlinks()
@@ -165,9 +172,20 @@ class PrerequisiteBuilder {
 	}
 
 	/**
+	 * Set absolute path of the source directory
+	 *
+	 * @param string $sourceDirectory The path
+	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 */
+	public function setSourceDirectory($sourceDirectory) {
+		$this->sourceDirectory = realpath($sourceDirectory) . '/';
+		return $this;
+	}
+
+	/**
 	 * Set absolute path of the working directory
 	 *
-	 * @param string $workingDirectory The absolute path
+	 * @param string $workingDirectory The path
 	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
 	 */
 	public function setWorkingDirectory($workingDirectory) {
@@ -200,10 +218,13 @@ class PrerequisiteBuilder {
 	 */
 	public function createSymlinks() {
 		foreach ($this->symlinks as $targetPath => $sourcePath) {
-			$this->createLink(
-				$this->workingDirectory . $sourcePath,
-				$this->workingDirectory . $targetPath
-			);
+			$targetPath = $this->workingDirectory . $targetPath;
+			if ($sourcePath === '@source') {
+				$sourcePath = $this->sourceDirectory;
+			} else {
+				$sourcePath = $this->workingDirectory . $sourcePath;
+			}
+			$this->createLink($sourcePath, $targetPath);
 		}
 		return $this;
 	}
@@ -218,7 +239,7 @@ class PrerequisiteBuilder {
 		if (stripos($_SERVER['SERVER_SOFTWARE'], 'apache') !== FALSE) {
 			$filename = $this->workingDirectory . '.htaccess';
 		}
-		$this->createLink($this->workingDirectory . '../source/_.htaccess', $filename);
+		$this->createLink($this->sourceDirectory . '_.htaccess', $filename);
 		return $this;
 	}
 
