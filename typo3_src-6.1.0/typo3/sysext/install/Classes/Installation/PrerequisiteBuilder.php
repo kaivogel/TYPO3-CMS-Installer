@@ -1,5 +1,5 @@
 <?php
-namespace TYPO3\CMS\Install;
+namespace TYPO3\CMS\Install\Installation;
 
 /***********************************************************************
  *  Copyright notice
@@ -26,7 +26,7 @@ namespace TYPO3\CMS\Install;
  **********************************************************************/
 
 /**
- * Prerequisite builder for the
+ * Prerequisite builder for the TYPO3 installation
  *
  * This script is internal code and subject to change.
  * DO NOT use it in own code, or be prepared your code might
@@ -37,7 +37,7 @@ namespace TYPO3\CMS\Install;
 class PrerequisiteBuilder {
 
 	/**
-	 * @var \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @var \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	static protected $instance = NULL;
 
@@ -72,7 +72,6 @@ class PrerequisiteBuilder {
 	 * @var array
 	 */
 	protected $symlinks = array(
-		'typo3_src' => '@source',
 		't3lib' => 'typo3_src/t3lib',
 		'typo3' => 'typo3_src/typo3',
 	);
@@ -143,28 +142,29 @@ class PrerequisiteBuilder {
 	/**
 	 * Return 'this' as singleton
 	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 * @internal This is not a public API method, do not use in own extensions
 	 */
 	static public function getInstance() {
 		if (is_null(self::$instance)) {
-			self::$instance = new \TYPO3\CMS\Install\PrerequisiteBuilder();
+			self::$instance = new \TYPO3\CMS\Install\Installation\PrerequisiteBuilder();
 		}
 		return self::$instance;
 	}
 
 	/**
-	 * Build all prerequisites at once
+	 * Build all prerequisites for an initial installation
 	 *
 	 * @param string $sourceDirectory The source directory
 	 * @param string $workingDirectory The working directory
 	 * @return void
 	 */
-	static public function buildAll($sourceDirectory, $workingDirectory) {
+	static public function buildInitialEnvironment($sourceDirectory, $workingDirectory) {
 		static::getInstance()
 			->setSourceDirectory($sourceDirectory)
 			->setWorkingDirectory($workingDirectory)
 			->createDirectoryStructure()
+			->createOrReplaceSourceSymlink()
 			->createSymlinks()
 			->createHtaccessFile()
 			->createLocalConfigurationFile()
@@ -172,10 +172,24 @@ class PrerequisiteBuilder {
 	}
 
 	/**
+	 * Build all prerequisites for an update
+	 *
+	 * @param string $sourceDirectory The source directory
+	 * @param string $workingDirectory The working directory
+	 * @return void
+	 */
+	static public function updateEnvironment($sourceDirectory, $workingDirectory) {
+		static::getInstance()
+			->setSourceDirectory($sourceDirectory)
+			->setWorkingDirectory($workingDirectory)
+			->createOrReplaceSourceSymlink();
+	}
+
+	/**
 	 * Set absolute path of the source directory
 	 *
 	 * @param string $sourceDirectory The path
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function setSourceDirectory($sourceDirectory) {
 		$this->sourceDirectory = realpath($sourceDirectory) . '/';
@@ -186,7 +200,7 @@ class PrerequisiteBuilder {
 	 * Set absolute path of the working directory
 	 *
 	 * @param string $workingDirectory The path
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function setWorkingDirectory($workingDirectory) {
 		$this->workingDirectory = realpath($workingDirectory) . '/';
@@ -196,7 +210,7 @@ class PrerequisiteBuilder {
 	/**
 	 * Create all required directories
 	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function createDirectoryStructure() {
 		foreach ($this->directories as $directory) {
@@ -212,19 +226,30 @@ class PrerequisiteBuilder {
 	}
 
 	/**
+	 * Create symlink to source directory
+	 *
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
+	 */
+	public function createOrReplaceSourceSymlink() {
+		$targetPath = $this->workingDirectory . 'typo3_src';
+		if (@file_exists($targetPath) !== FALSE) {
+			@unlink($targetPath);
+		}
+		$this->createLink($this->sourceDirectory, $targetPath);
+		return $this;
+	}
+
+	/**
 	 * Create all required symlinks
 	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function createSymlinks() {
 		foreach ($this->symlinks as $targetPath => $sourcePath) {
-			$targetPath = $this->workingDirectory . $targetPath;
-			if ($sourcePath === '@source') {
-				$sourcePath = $this->sourceDirectory;
-			} else {
-				$sourcePath = $this->workingDirectory . $sourcePath;
-			}
-			$this->createLink($sourcePath, $targetPath);
+			$this->createLink(
+				$this->workingDirectory . $sourcePath,
+				$this->workingDirectory . $targetPath
+			);
 		}
 		return $this;
 	}
@@ -232,7 +257,7 @@ class PrerequisiteBuilder {
 	/**
 	 * Create symlink to _.htaccess file
 	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function createHtaccessFile() {
 		$filename = $this->workingDirectory . '_.htaccess';
@@ -246,15 +271,15 @@ class PrerequisiteBuilder {
 	/**
 	 * Create LocalConfiguration.php
 	 *
-	 * Define the constant "TYPO3_PACKAGE_CONFIGURATION_FILE" with the
-	 * path to your php file to extend default configuration. The file
-	 * must return an array of configuration:
+	 * Define the constant "TYPO3_PACKAGE_CONFIGURATION_FILE" with a path
+	 * to your own php file to extend default configuration. The file must
+	 * return an array of configuration values:
 	 *
 	 * <?php
 	 * return array(...);
 	 * ?>
 	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function createLocalConfigurationFile() {
 		$filename = $this->workingDirectory . 'typo3conf/LocalConfiguration.php';
@@ -273,7 +298,7 @@ class PrerequisiteBuilder {
 	/**
 	 * Create FIRST_INSTALLATION file in /typo3conf/
 	 *
-	 * @return \TYPO3\CMS\Install\PrerequisiteBuilder
+	 * @return \TYPO3\CMS\Install\Installation\PrerequisiteBuilder
 	 */
 	public function createFirstInstallFile() {
 		$quickstartFile = $this->workingDirectory . 'typo3conf/FIRST_INSTALL';
